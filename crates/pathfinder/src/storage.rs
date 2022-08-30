@@ -6,7 +6,7 @@ mod contract;
 mod ethereum;
 #[cfg(test)]
 pub(crate) mod fixtures;
-pub(crate) mod merkle_tree;
+pub mod merkle_tree;
 mod schema;
 mod state;
 
@@ -16,8 +16,9 @@ pub use contract::{ContractCodeTable, ContractsTable};
 pub use ethereum::{EthereumBlocksTable, EthereumTransactionsTable};
 pub use state::{
     CanonicalBlocksTable, ContractsStateTable, EventFilterError, L1StateTable, L1TableBlockId,
-    RefsTable, StarknetBlock, StarknetBlocksBlockId, StarknetBlocksTable, StarknetEmittedEvent,
-    StarknetEventFilter, StarknetEventsTable, StarknetStateUpdatesTable, StarknetTransactionsTable,
+    RefsTable, StarknetBlock, StarknetBlocksBlockId, StarknetBlocksNumberOrLatest,
+    StarknetBlocksTable, StarknetEmittedEvent, StarknetEventFilter, StarknetEventsTable,
+    StarknetStateUpdatesTable, StarknetTransactionsTable,
 };
 
 use anyhow::Context;

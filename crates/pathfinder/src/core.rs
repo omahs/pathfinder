@@ -14,6 +14,7 @@ pub struct ContractAddress(StarkHash);
 
 macros::starkhash251::newtype!(ContractAddress);
 macros::starkhash251::deserialization!(ContractAddress);
+macros::fmt::thin_display!(ContractAddress);
 
 /// A nonce that is associated with a particular deployed StarkNet contract
 /// distinguishing it from other contracts that use the same contract class.
@@ -96,7 +97,7 @@ pub struct CallSignatureElem(pub StarkHash);
 pub struct ByteCodeWord(pub StarkHash);
 
 /// The address of a storage element for a StarkNet contract.
-#[derive(Copy, Clone, PartialEq, Eq, Serialize, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Serialize, PartialOrd, Ord, Hash)]
 pub struct StorageAddress(StarkHash);
 
 macros::starkhash251::newtype!(StorageAddress);

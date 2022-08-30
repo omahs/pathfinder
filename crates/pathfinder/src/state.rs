@@ -81,7 +81,7 @@ pub(crate) fn update_contract_state(
 }
 
 /// Calculates the contract state hash from its preimage.
-fn calculate_contract_state_hash(hash: ClassHash, root: ContractRoot) -> ContractStateHash {
+pub fn calculate_contract_state_hash(hash: ClassHash, root: ContractRoot) -> ContractStateHash {
     const RESERVED: StarkHash = StarkHash::ZERO;
     const CONTRACT_VERSION: StarkHash = StarkHash::ZERO;
 
