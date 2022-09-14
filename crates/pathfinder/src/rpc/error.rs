@@ -177,7 +177,7 @@ macro_rules! rpc_error_subset {
         }
     };
     // Append this variant to arms. Continue parsing the remaining variants.
-    (@parse, $var:ident, $enum_name:ident, {$($arms:tt)*}, $variant:tt $($tail:tt)*) => {
+    (@parse, $var:ident, $enum_name:ident, {$($arms:tt)*}, $variant:tt, $($tail:tt)*) => {
         rpc_error_subset!(
             @parse, $var, $enum_name,
             {
