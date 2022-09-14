@@ -127,17 +127,17 @@ macro_rules! rpc_error_subset {
     // and therefore not implemented.
 
     // Entry-point for the macro
-    ($enum_name:ident: $($subset:tt),+) => {
-        rpc_error_subset!(@enum_def, $enum_name, $($subset),+);
+    ($enum_name:ident: $($subset:tt),*) => {
+        rpc_error_subset!(@enum_def, $enum_name, $($subset),*);
         rpc_error_subset!(@from_anyhow, $enum_name);
-        rpc_error_subset!(@from_def, $enum_name, $($subset),+);
+        rpc_error_subset!(@from_def, $enum_name, $($subset),*);
     };
     // Generates the enum definition, nothing tricky here.
-    (@enum_def, $enum_name:ident, $($subset:tt),+) => {
+    (@enum_def, $enum_name:ident, $($subset:tt),*) => {
         #[derive(Debug)]
         pub enum $enum_name {
-            $($subset),+,
             Internal(anyhow::Error),
+            $($subset),*
         }
     };
     // Generates From<anyhow::Error>, nothing tricky here.
@@ -162,7 +162,7 @@ macro_rules! rpc_error_subset {
     //
     // By pushing the arms from this level downwards, and creating the match statement at the lowest
     // level, we guarantee that only valid valid Rust will bubble back up.
-    (@from_def, $enum_name:ident, $($variants:ident),*) => {
+    (@from_def, $enum_name:ident, $($variants:tt),*) => {
         impl From<$enum_name> for crate::rpc::error::RpcError {
             fn from(x: $enum_name) -> Self {
                 rpc_error_subset!(@parse, x, $enum_name, {}, $($variants),*)
@@ -177,7 +177,7 @@ macro_rules! rpc_error_subset {
         }
     };
     // Append this variant to arms. Continue parsing the remaining variants.
-    (@parse, $var:ident, $enum_name:ident, {$($arms:tt)*}, $variant:ident, $($tail:ident),*) => {
+    (@parse, $var:ident, $enum_name:ident, {$($arms:tt)*}, $variant:tt $($tail:tt)*) => {
         rpc_error_subset!(
             @parse, $var, $enum_name,
             {
@@ -191,3 +191,36 @@ macro_rules! rpc_error_subset {
 
 #[allow(dead_code, unused_imports)]
 pub(super) use rpc_error_subset;
+
+#[cfg(test)]
+mod tests {
+    mod rpc_error_subset {
+        use super::super::{rpc_error_subset, RpcError};
+        use assert_matches::assert_matches;
+
+        #[test]
+        fn no_variant() {
+            rpc_error_subset!(EMPTY:);
+        }
+
+        #[test]
+        fn single_variant() {
+            rpc_error_subset!(SINGLE: ContractNotFound);
+
+            let original = RpcError::from(SINGLE::ContractNotFound);
+
+            assert_matches!(original, RpcError::ContractNotFound);
+        }
+
+        #[test]
+        fn multi_variant() {
+            rpc_error_subset!(MULTI: ContractNotFound, NoBlocks);
+
+            let contract_not_found = RpcError::from(MULTI::ContractNotFound);
+            let no_blocks = RpcError::from(MULTI::NoBlocks);
+
+            assert_matches!(contract_not_found, RpcError::ContractNotFound);
+            assert_matches!(no_blocks, RpcError::NoBlocks);
+        }
+    }
+}
