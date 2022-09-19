@@ -681,6 +681,13 @@ pub mod reply {
             pub nonces: Vec<Nonce>,
         }
 
+        /// Convert from the v0.1.0 representation we have in the storage to the new one.
+        ///
+        /// We need this conversion because the representation of storage diffs have changed
+        /// in v0.2.0 of the JSON-RPC specification and we're storing v0.1.0 formatted JSONs
+        /// in our storage.
+        /// Storage updates are now grouped per-contract and individual update entries no
+        /// longer contain the contract address.
         impl From<crate::rpc::v01::types::reply::state_update::StateDiff> for StateDiff {
             fn from(diff: crate::rpc::v01::types::reply::state_update::StateDiff) -> Self {
                 let mut per_contract_diff: HashMap<ContractAddress, Vec<StorageEntry>> =
