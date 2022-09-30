@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    # "crates/load-test",
     "crates/pathfinder",
     "crates/stark_curve",
     "crates/stark_hash",
 ]
+exclude = ["crates/load-test"]
 resolver = "2"

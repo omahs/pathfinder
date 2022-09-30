@@ -300,7 +300,7 @@ pub fn register_all_methods(module: &mut jsonrpsee::RpcModule<RpcContext>) -> an
 mod tests {
     use super::RpcContext;
     use crate::rpc::{test_client::client, RpcApi, RpcServer};
-    use jsonrpsee::rpc_params;
+    use serde_json::json;
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
     #[tokio::test]
@@ -323,7 +323,7 @@ mod tests {
         let client = client(addr);
 
         // A method with no params via `register_method_with_no_input`
-        let params = rpc_params!();
+        let params = json!([]);
         let number = client
             .request::<u64>("starknet_blockNumber", params)
             .await
@@ -331,7 +331,7 @@ mod tests {
         assert_eq!(number, 2);
 
         // A method with params via `register_method`
-        let params = rpc_params!("latest");
+        let params = json!(["latest"]);
         let number = client
             .request::<u64>("starknet_getBlockTransactionCount", params)
             .await
