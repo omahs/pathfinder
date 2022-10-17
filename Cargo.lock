@@ -1332,7 +1332,7 @@ dependencies = [
 [[package]]
 name = "jsonrpsee"
 version = "0.15.1"
-source = "git+https://github.com/eqlabs/jsonrpsee?rev=45c94a271d92294eda2a2c7d26477044a5983a25#45c94a271d92294eda2a2c7d26477044a5983a25"
+source = "git+https://github.com/eqlabs/jsonrpsee?rev=a23589bc3988a28506ed8a37527b6adc04f31627#a23589bc3988a28506ed8a37527b6adc04f31627"
 dependencies = [
  "jsonrpsee-core",
  "jsonrpsee-server",
@@ -1342,7 +1342,7 @@ dependencies = [
 [[package]]
 name = "jsonrpsee-core"
 version = "0.15.1"
-source = "git+https://github.com/eqlabs/jsonrpsee?rev=45c94a271d92294eda2a2c7d26477044a5983a25#45c94a271d92294eda2a2c7d26477044a5983a25"
+source = "git+https://github.com/eqlabs/jsonrpsee?rev=a23589bc3988a28506ed8a37527b6adc04f31627#a23589bc3988a28506ed8a37527b6adc04f31627"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -1367,7 +1367,7 @@ dependencies = [
 [[package]]
 name = "jsonrpsee-server"
 version = "0.15.1"
-source = "git+https://github.com/eqlabs/jsonrpsee?rev=45c94a271d92294eda2a2c7d26477044a5983a25#45c94a271d92294eda2a2c7d26477044a5983a25"
+source = "git+https://github.com/eqlabs/jsonrpsee?rev=a23589bc3988a28506ed8a37527b6adc04f31627#a23589bc3988a28506ed8a37527b6adc04f31627"
 dependencies = [
  "futures-channel",
  "futures-util",
@@ -1388,7 +1388,7 @@ dependencies = [
 [[package]]
 name = "jsonrpsee-types"
 version = "0.15.1"
-source = "git+https://github.com/eqlabs/jsonrpsee?rev=45c94a271d92294eda2a2c7d26477044a5983a25#45c94a271d92294eda2a2c7d26477044a5983a25"
+source = "git+https://github.com/eqlabs/jsonrpsee?rev=a23589bc3988a28506ed8a37527b6adc04f31627#a23589bc3988a28506ed8a37527b6adc04f31627"
 dependencies = [
  "anyhow",
  "beef",
