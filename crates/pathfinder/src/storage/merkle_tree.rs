@@ -42,10 +42,12 @@
 use std::borrow::Cow;
 
 use anyhow::Context;
-use bitvec::{order::Msb0, prelude::BitVec, view::BitView};
+use bitvec::{order::Msb0, view::BitView};
 use rusqlite::{params, OptionalExtension, Transaction};
 
 use stark_hash::StarkHash;
+
+use crate::state::merkle_node::Path;
 
 /// Provides a reference counted storage backend for the
 /// nodes of a Starknet Binary Merkle Patricia Tree.
@@ -187,7 +189,10 @@ pub struct PersistedBinaryNode {
 /// An edge node which can be read / written from an [RcNodeStorage].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PersistedEdgeNode {
-    pub path: BitVec<Msb0, u8>,
+    // pub path: BitVec<Msb0, u8>,
+    // pub path: BitArray<Msb0, [u8; 32]>,
+    // pub path_len: usize,
+    pub path: Path,
     pub child: StarkHash,
 }
 
@@ -217,7 +222,7 @@ impl PersistedNode {
                 // bytes (32) but the path length may vary, we have to ensure we are writing
                 // to the end of the slice.
                 buffer[32..][..32].view_bits_mut::<Msb0>()[256 - edge.path.len()..]
-                    .copy_from_bitslice(&edge.path);
+                    .copy_from_bitslice(edge.path.as_bitslice());
 
                 buffer[64] = length;
 
@@ -252,7 +257,8 @@ impl PersistedNode {
                 // Grab the __last__ `length` bits. Path is stored in MSB format, which means LSB
                 // is always stored in the last bit. Since the path may vary in length we must take
                 // the last bits.
-                let path = path.view_bits::<Msb0>()[256 - length..].to_bitvec();
+                // let path = path.view_bits::<Msb0>()[256 - length..].to_bitvec();
+                let path = path.view_bits::<Msb0>()[256 - length..].into();
 
                 let child = StarkHash::from_be_bytes(child)
                     .context("Edge node's child hash is corrupt.")?;
@@ -525,7 +531,7 @@ mod tests {
             let mut scratch = [0u8; 65];
 
             for i in 0..251 {
-                let path = bits251[i..].to_bitvec();
+                let path = bits251[i..].into();
 
                 let original = PersistedNode::Edge(PersistedEdgeNode { path, child });
 
@@ -680,7 +686,7 @@ mod tests {
 
             let parent_key = starkhash!("def123");
             let parent = PersistedNode::Edge(PersistedEdgeNode {
-                path: bitvec![Msb0, u8; 1, 0, 0],
+                path: bitvec![Msb0, u8; 1, 0, 0].into(),
                 child: child_key,
             });
 
@@ -791,7 +797,7 @@ mod tests {
 
             let parent_key = starkhash!("def123");
             let parent = PersistedNode::Edge(PersistedEdgeNode {
-                path: bitvec![Msb0, u8; 1, 0, 0],
+                path: bitvec![Msb0, u8; 1, 0, 0].into(),
                 child: child_key,
             });
 
@@ -816,11 +822,11 @@ mod tests {
             let parent_key_2 = starkhash!("0222");
 
             let parent_node_1 = PersistedNode::Edge(PersistedEdgeNode {
-                path: bitvec![Msb0, u8; 1, 0, 0],
+                path: bitvec![Msb0, u8; 1, 0, 0].into(),
                 child: leaf_key,
             });
             let parent_node_2 = PersistedNode::Edge(PersistedEdgeNode {
-                path: bitvec![Msb0, u8; 1, 1, 1],
+                path: bitvec![Msb0, u8; 1, 1, 1].into(),
                 child: leaf_key,
             });
 

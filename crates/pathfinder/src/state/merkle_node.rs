@@ -4,9 +4,13 @@
 //! For more information about how these Starknet trees are structured, see
 //! [`MerkleTree`](super::merkle_tree::MerkleTree).
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ops::Index, rc::Rc};
 
-use bitvec::{order::Msb0, prelude::BitVec, slice::BitSlice};
+use bitvec::{
+    order::Msb0,
+    prelude::{BitArray, BitVec},
+    slice::BitSlice,
+};
 use stark_hash::{stark_hash, StarkHash};
 
 /// A node in a Binary Merkle-Patricia Tree graph.
@@ -46,7 +50,7 @@ pub struct EdgeNode {
     /// The starting height of this node in the tree.
     pub height: usize,
     /// The path this edge takes.
-    pub path: BitVec<Msb0, u8>,
+    pub path: Path,
     /// The child of this node.
     pub child: Rc<RefCell<Node>>,
 }
@@ -194,7 +198,7 @@ impl Node {
 impl EdgeNode {
     /// Returns true if the edge node's path matches the same path given by the key.
     pub fn path_matches(&self, key: &BitSlice<Msb0, u8>) -> bool {
-        self.path == key[self.height..self.height + self.path.len()]
+        self.path.as_bitslice() == key[self.height..self.height + self.path.len()]
     }
 
     /// Returns the common bit prefix between the edge node's path and the given key.
@@ -207,7 +211,7 @@ impl EdgeNode {
             .take_while(|(a, b)| a == b)
             .count();
 
-        &self.path[..common_length]
+        &self.path.as_bitslice()[..common_length]
     }
 
     /// If possible, calculates and sets its own hash value.
@@ -226,7 +230,7 @@ impl EdgeNode {
             None => unreachable!("subtree has to be commited before"),
         };
 
-        let path = StarkHash::from_bits(&self.path).unwrap();
+        let path = StarkHash::from_bits(self.path.as_bitslice()).unwrap();
         let mut length = [0; 32];
         // Safe as len() is guaranteed to be <= 251
         length[31] = self.path.len() as u8;
@@ -234,6 +238,94 @@ impl EdgeNode {
         let length = StarkHash::from_be_bytes(length).unwrap();
         let hash = stark_hash(child, path) + length;
         self.hash = Some(hash);
+    }
+}
+
+/// On-stack `BitArray` wrapper that resembles a `BitVector` in its api.
+/// Contains up to 256 bits accessable mostly via a `BitSlice`.
+#[derive(Copy, Clone, Debug, Default, Eq)]
+pub struct Path {
+    pub storage: BitArray<Msb0, [u8; 32]>,
+    len: usize,
+}
+
+impl Path {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn extend_from_bitslice(&mut self, other: &BitSlice<Msb0, u8>) {
+        let start = self.len;
+        let stop = start + other.len();
+        self.storage[start..stop].copy_from_bitslice(other);
+        self.len += other.len();
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn as_bitslice(&self) -> &BitSlice<Msb0, u8> {
+        &self.storage[..self.len]
+    }
+
+    pub fn iter(&self) -> bitvec::slice::Iter<'_, Msb0, u8> {
+        self.as_bitslice().iter()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Panics when capacity exceeded
+    pub fn push(&mut self, value: bool) {
+        self.storage.set(self.len, value);
+        self.len += 1;
+    }
+}
+
+impl PartialEq for Path {
+    fn eq(&self, other: &Self) -> bool {
+        if self.len != other.len {
+            return false;
+        }
+
+        self.storage == other.storage
+    }
+}
+
+impl From<&BitSlice<Msb0, u8>> for Path {
+    fn from(s: &BitSlice<Msb0, u8>) -> Self {
+        let mut path = Self::default();
+        path.extend_from_bitslice(s);
+        path
+    }
+}
+
+impl From<BitVec<Msb0, u8>> for Path {
+    fn from(v: BitVec<Msb0, u8>) -> Self {
+        let mut path = Self::default();
+        path.extend_from_bitslice(&v[..]);
+        path
+    }
+}
+
+impl From<Direction> for Path {
+    fn from(value: Direction) -> Self {
+        let mut path = Self::default();
+        path.push(value.into());
+        path
+    }
+}
+
+impl<Idx> Index<Idx> for Path
+where
+    BitSlice<Msb0, u8>: Index<Idx>,
+{
+    type Output = <BitSlice<Msb0, u8> as Index<Idx>>::Output;
+
+    fn index(&self, index: Idx) -> &Self::Output {
+        &self.as_bitslice()[index]
     }
 }
 
@@ -359,7 +451,7 @@ mod tests {
             let child = starkhash!("1234ABCD");
             let child = Rc::new(RefCell::new(Node::Unresolved(child)));
             // Path = 42 in binary.
-            let path = bitvec![Msb0, u8; 1, 0, 1, 0, 1, 0];
+            let path = bitvec![Msb0, u8; 1, 0, 1, 0, 1, 0].into();
 
             let mut uut = EdgeNode {
                 hash: None,
@@ -385,7 +477,7 @@ mod tests {
                 let uut = EdgeNode {
                     hash: None,
                     height: 0,
-                    path: key.view_bits().to_bitvec(),
+                    path: key.view_bits().into(),
                     child,
                 };
 
@@ -397,7 +489,7 @@ mod tests {
                 let key = starkhash!("0123456789abcdef");
                 let child = Rc::new(RefCell::new(Node::Leaf(starkhash!("0abc"))));
 
-                let path = key.view_bits()[..45].to_bitvec();
+                let path = key.view_bits()[..45].into();
 
                 let uut = EdgeNode {
                     hash: None,
@@ -414,7 +506,7 @@ mod tests {
                 let key = starkhash!("0123456789abcdef");
                 let child = Rc::new(RefCell::new(Node::Leaf(starkhash!("0abc"))));
 
-                let path = key.view_bits()[50..].to_bitvec();
+                let path = key.view_bits()[50..].into();
 
                 let uut = EdgeNode {
                     hash: None,
@@ -431,7 +523,7 @@ mod tests {
                 let key = starkhash!("0123456789abcdef");
                 let child = Rc::new(RefCell::new(Node::Leaf(starkhash!("0abc"))));
 
-                let path = key.view_bits()[230..235].to_bitvec();
+                let path = key.view_bits()[230..235].into();
 
                 let uut = EdgeNode {
                     hash: None,
@@ -442,6 +534,75 @@ mod tests {
 
                 assert!(uut.path_matches(key.view_bits()));
             }
+        }
+    }
+
+    mod path {
+        use bitvec::{
+            bitvec,
+            prelude::{BitArray, Msb0},
+        };
+
+        use crate::state::merkle_node::{Direction, Path};
+
+        #[test]
+        fn new_and_default() {
+            let n = Path::new();
+            let d = Path::default();
+            assert_eq!(n, d);
+            assert_eq!(n.len(), 0);
+            assert!(n.is_empty());
+            assert_eq!(n.iter().count(), 0);
+            assert_eq!(n.storage, BitArray::<Msb0, [u8; 32]>::zeroed());
+            assert!(n.as_bitslice().is_empty());
+        }
+
+        #[test]
+        fn from_bitslice_or_equivalent() {
+            [
+                bitvec![Msb0, u8;],
+                bitvec![Msb0, u8; 0, 1, 1, 0, 1],
+                bitvec![Msb0, u8; 0, 128],
+                bitvec![Msb0, u8; 1, 256],
+            ]
+            .into_iter()
+            .for_each(|expected| {
+                let mut extended = Path::new();
+                extended.extend_from_bitslice(&expected);
+                let from_slice = Path::from(&expected[..]);
+                let from_vec = Path::from(expected.clone());
+
+                assert_eq!(extended.len(), expected.len());
+                assert_eq!(extended.as_bitslice(), expected);
+                assert_eq!(extended, from_slice);
+                assert_eq!(extended, from_vec);
+
+                expected.iter().enumerate().for_each(|(i, expected_value)| {
+                    assert_eq!(expected_value, extended[i]);
+                });
+            });
+        }
+
+        #[test]
+        fn from_direction() {
+            let left = Path::from(Direction::Left);
+            assert_eq!(left.len(), 1);
+            assert!(!left[0]);
+
+            let right = Path::from(Direction::Right);
+            assert_eq!(right.len(), 1);
+            assert!(right[0]);
+        }
+
+        #[test]
+        fn index() {
+            assert!(Path::default()[..].is_empty());
+
+            let expected = bitvec![Msb0, u8; 0, 1, 1, 0, 1, 1];
+            let p = Path::from(expected);
+
+            assert!(p[1]);
+            assert_eq!(p[2..5], bitvec![Msb0, u8; 1, 0, 1]);
         }
     }
 }

@@ -45,12 +45,12 @@
 //! The in-memory tree is built using a graph of `Rc<RefCell<Node>>` which is a bit painful.
 
 use anyhow::Context;
-use bitvec::{prelude::BitSlice, prelude::BitVec, prelude::Msb0};
+use bitvec::{prelude::BitSlice, prelude::Msb0};
 use rusqlite::Transaction;
 use std::ops::ControlFlow;
 use std::{cell::RefCell, rc::Rc};
 
-use crate::state::merkle_node::{BinaryNode, Direction, EdgeNode, Node};
+use crate::state::merkle_node::{BinaryNode, Direction, EdgeNode, Node, Path};
 
 use crate::storage::merkle_tree::{
     PersistedBinaryNode, PersistedEdgeNode, PersistedNode, RcNodeStorage,
@@ -225,7 +225,7 @@ impl<T: NodeStorage> MerkleTree<T> {
                 // unwrap is safe as `commit_subtree` will set the hash.
                 let child = edge.child.borrow().hash().unwrap();
                 let persisted_node = PersistedNode::Edge(PersistedEdgeNode {
-                    path: edge.path.clone(),
+                    path: edge.path,
                     child,
                 });
                 // unwrap is safe as we just set the hash.
@@ -280,9 +280,10 @@ impl<T: NodeStorage> MerkleTree<T> {
                         let child_height = branch_height + 1;
 
                         // Path from binary node to new leaf
-                        let new_path = key[child_height..].to_bitvec();
+                        let new_path = Path::from(&key[child_height..]);
+
                         // Path from binary node to existing child
-                        let old_path = edge.path[common.len() + 1..].to_bitvec();
+                        let old_path = Path::from(&edge.path.as_bitslice()[common.len() + 1..]);
 
                         // The new leaf branch of the binary node.
                         // (this may be edge -> leaf, or just leaf depending).
@@ -333,7 +334,7 @@ impl<T: NodeStorage> MerkleTree<T> {
                             false => Node::Edge(EdgeNode {
                                 hash: None,
                                 height: edge.height,
-                                path: common.to_bitvec(),
+                                path: common.into(),
                                 child: Rc::new(RefCell::new(branch)),
                             }),
                         }
@@ -356,7 +357,7 @@ impl<T: NodeStorage> MerkleTree<T> {
                 let edge = Node::Edge(EdgeNode {
                     hash: None,
                     height: 0,
-                    path: key.to_bitvec(),
+                    path: key.into(),
                     child: Rc::new(RefCell::new(leaf)),
                 });
 
@@ -417,11 +418,11 @@ impl<T: NodeStorage> MerkleTree<T> {
                     //      and a path of just a single bit.
                     let direction = binary.direction(key).invert();
                     let child = binary.get_child(direction);
-                    let path = std::iter::once(bool::from(direction)).collect::<BitVec<_, _>>();
+
                     let mut edge = EdgeNode {
                         hash: None,
                         height: binary.height,
-                        path,
+                        path: direction.into(),
                         child,
                     };
 
@@ -574,7 +575,10 @@ impl<T: NodeStorage> MerkleTree<T> {
         };
 
         if let Some(child_edge) = resolved_child.as_edge().cloned() {
-            parent.path.extend_from_bitslice(&child_edge.path);
+            parent
+                .path
+                .extend_from_bitslice(child_edge.path.as_bitslice());
+
             parent.child = child_edge.child;
         }
 
@@ -596,17 +600,15 @@ impl<T: NodeStorage> MerkleTree<T> {
     where
         VisitorFn: FnMut(&Node, &BitSlice<Msb0, u8>) -> ControlFlow<X, Visit>,
     {
-        use bitvec::prelude::bitvec;
-
         #[allow(dead_code)]
         struct VisitedNode {
             node: Rc<RefCell<Node>>,
-            path: BitVec<Msb0, u8>,
+            path: Path,
         }
 
         let mut visiting = vec![VisitedNode {
             node: self.root.clone(),
-            path: bitvec![Msb0, u8;],
+            path: Path::default(),
         }];
 
         loop {
@@ -615,7 +617,7 @@ impl<T: NodeStorage> MerkleTree<T> {
                 Some(VisitedNode { node, path }) => {
                     let current_node = &*node.borrow();
                     if !matches!(current_node, Node::Unresolved(StarkHash::ZERO)) {
-                        match visitor_fn(current_node, &path) {
+                        match visitor_fn(current_node, path.as_bitslice()) {
                             ControlFlow::Continue(Visit::ContinueDeeper) => {
                                 // the default, no action, just continue deeper
                             }
@@ -634,7 +636,7 @@ impl<T: NodeStorage> MerkleTree<T> {
                             visiting.push(VisitedNode {
                                 node: b.right.clone(),
                                 path: {
-                                    let mut path_right = path.clone();
+                                    let mut path_right = path;
                                     path_right.push(Direction::Right.into());
                                     path_right
                                 },
@@ -642,7 +644,7 @@ impl<T: NodeStorage> MerkleTree<T> {
                             visiting.push(VisitedNode {
                                 node: b.left.clone(),
                                 path: {
-                                    let mut path_left = path.clone();
+                                    let mut path_left = path;
                                     path_left.push(Direction::Left.into());
                                     path_left
                                 },
@@ -652,8 +654,8 @@ impl<T: NodeStorage> MerkleTree<T> {
                             visiting.push(VisitedNode {
                                 node: e.child.clone(),
                                 path: {
-                                    let mut extended_path = path.clone();
-                                    extended_path.extend_from_bitslice(&e.path);
+                                    let mut extended_path = path;
+                                    extended_path.extend_from_bitslice(e.path.as_bitslice());
                                     extended_path
                                 },
                             });
@@ -833,7 +835,7 @@ mod tests {
 
             // The tree should consist of an edge node (root) leading to a leaf node.
             // The edge node path should match the key, and the leaf node the value.
-            let expected_path = key.clone();
+            let expected_path = key.into();
 
             let edge = uut
                 .root
@@ -872,7 +874,7 @@ mod tests {
                 .cloned()
                 .expect("root should be an edge");
 
-            let expected_path = bitvec![Msb0, u8; 0; 50];
+            let expected_path = bitvec![Msb0, u8; 0; 50].into();
             assert_eq!(edge.path, expected_path);
             assert_eq!(edge.height, 0);
 
@@ -990,7 +992,7 @@ mod tests {
             let mut expected_path = key0.to_bitvec();
             expected_path.pop();
 
-            assert_eq!(edge.path, expected_path);
+            assert_eq!(edge.path, expected_path.into());
             assert_eq!(edge.height, 0);
 
             let binary = edge
@@ -1545,7 +1547,7 @@ mod tests {
                 Node::Edge(EdgeNode {
                     hash: None,
                     height: 0,
-                    path: bitvec![Msb0, u8; 0; 250],
+                    path: bitvec![Msb0, u8; 0; 250].into(),
                     child: Rc::new(RefCell::new(expected_1.0.clone())),
                 }),
                 bitvec![Msb0, u8;],
@@ -1606,7 +1608,7 @@ mod tests {
                 Node::Edge(EdgeNode {
                     hash: None,
                     height: 250,
-                    path: bitvec![Msb0, u8; 1; 1],
+                    path: bitvec![Msb0, u8; 1; 1].into(),
                     child: Rc::new(RefCell::new(expected_6.0.clone())),
                 }),
                 path_to_5,
@@ -1635,7 +1637,7 @@ mod tests {
                 Node::Edge(EdgeNode {
                     hash: None,
                     height: 0,
-                    path: path_to_1,
+                    path: path_to_1.into(),
                     child: Rc::new(RefCell::new(expected_1.0.clone())),
                 }),
                 path_to_0,
