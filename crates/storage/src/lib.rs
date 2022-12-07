@@ -86,6 +86,28 @@ impl Storage {
                 .context("Set journal size limit")?;
             }
         }
+        conn.create_scalar_function(
+            "starknet_event_keys_to_fts",
+            1,
+            rusqlite::functions::FunctionFlags::SQLITE_DIRECTONLY,
+            move |ctx| {
+                let input = ctx.get::<Vec<u8>>(0)?;
+                let encoded: Vec<_> = input
+                    .chunks_exact(32)
+                    .map(|key| data_encoding::BASE32_NOPAD.encode(key))
+                    .collect();
+                Ok(encoded.join(" "))
+            },
+        )
+        .context("Add custom function")?;
+
+        let encoded: String = conn.query_row_and_then(
+            "SELECT starknet_event_keys_to_fts(x'02EBBD6878F81E49560AE863BD4EF327A417037BF57B63A016130AD0A94C8EAC02EBBD6878F81E49560AE863BD4EF327A417037BF57B63A016130AD0A94C8EAC')", 
+            [],
+             |row| row.get(0))
+            .context("Check custom function")?;
+        tracing::warn!(%encoded, "Encoded keys");
+
         migrate_database(&mut conn).context("Migrate database")?;
 
         let inner = Inner {

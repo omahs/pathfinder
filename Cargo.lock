@@ -871,6 +871,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-encoding"
+version = "2.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23d8666cb01533c39dde32bcbab8e227b4ed6679b2c925eba05feabea39508fb"
+
+[[package]]
 name = "der"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2846,6 +2852,7 @@ dependencies = [
  "assert_matches",
  "base64 0.13.1",
  "bitvec 0.20.4",
+ "data-encoding",
  "ethers",
  "flate2",
  "hex",
