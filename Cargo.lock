@@ -4118,6 +4118,7 @@ dependencies = [
  "clap",
  "delay_map",
  "futures",
+ "hex",
  "libp2p",
  "p2p_proto",
  "prost",
