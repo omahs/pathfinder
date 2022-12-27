@@ -253,11 +253,20 @@ async fn provide_capability() {
 
 #[test_log::test(tokio::test)]
 async fn subscription_and_propagation() {
+    use fake::{Fake, Faker};
     use p2p_proto::common::{BlockBody, BlockHeader};
     use p2p_proto::propagation::{
         BlockStateUpdate, Message, NewBlockBody, NewBlockHeader, NewBlockState,
     };
     use pathfinder_common::starkhash;
+
+    let new_block_header = Faker.fake::<NewBlockHeader>();
+    let new_block_body = Faker.fake::<NewBlockBody>();
+    let new_block_state = Faker.fake::<NewBlockState>();
+
+    tracing::info!(?new_block_header);
+    tracing::info!(?new_block_body);
+    tracing::info!(?new_block_state);
 
     const NEW_BLOCK_HEADER: Message = Message::NewBlockHeader(NewBlockHeader {
         header: BlockHeader {

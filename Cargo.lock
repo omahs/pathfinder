@@ -4245,6 +4245,7 @@ dependencies = [
  "clap",
  "delay_map",
  "env_logger",
+ "fake",
  "futures",
  "hex",
  "hex-literal",
@@ -4252,6 +4253,7 @@ dependencies = [
  "p2p_proto",
  "pathfinder-common",
  "prost",
+ "rand 0.8.5",
  "serde",
  "serde_derive",
  "serde_json",
@@ -4287,10 +4289,12 @@ name = "p2p_proto"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "fake",
  "p2p_proto_derive",
  "primitive-types",
  "prost",
  "prost-build",
+ "rand 0.8.5",
  "stark_hash",
  "zstd",
 ]
