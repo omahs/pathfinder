@@ -116,13 +116,9 @@ impl Peers {
     }
 
     pub fn syncing(&self) -> impl Iterator<Item = (&PeerId, &p2p_proto::sync::Status)> {
-        self.peers.iter().filter_map(|(peer_id, peer)| {
-            if let Some(status) = &peer.sync_status {
-                Some((peer_id, status))
-            } else {
-                None
-            }
-        })
+        self.peers
+            .iter()
+            .filter_map(|(peer_id, peer)| peer.sync_status.as_ref().map(|status| (peer_id, status)))
     }
 
     pub fn remove(&mut self, peer_id: &PeerId) {
