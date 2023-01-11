@@ -11,7 +11,7 @@ use pathfinder_common::{
 use stark_hash::Felt;
 use starknet_gateway_types::reply::transaction::{
     self, DeclareTransaction, DeployTransaction, EntryPointType, InvokeTransaction,
-    InvokeTransactionV0,
+    InvokeTransactionV0, Receipt,
 };
 
 pub const NUM_BLOCKS: usize = 4;
@@ -169,8 +169,13 @@ pub(crate) fn extract_events(
         .collect()
 }
 
-/// Creates a storage instance in memory with a set of expected emitted events
-pub fn setup_test_storage() -> (Storage, Vec<StarknetEmittedEvent>) {
+pub fn setup_test_storage_and_return_test_data() -> (
+    Storage,
+    Vec<StarknetBlock>,
+    Vec<transaction::Transaction>,
+    Vec<Receipt>,
+    Vec<StarknetEmittedEvent>,
+) {
     use crate::CanonicalBlocksTable;
 
     let storage = Storage::in_memory().unwrap();
@@ -196,6 +201,14 @@ pub fn setup_test_storage() -> (Storage, Vec<StarknetEmittedEvent>) {
     tx.commit().unwrap();
 
     let events = extract_events(&blocks, &transactions_and_receipts);
+    let (transactions, receipts): (Vec<_>, Vec<_>) = transactions_and_receipts.into_iter().unzip();
 
+    (storage, blocks.into(), transactions, receipts, events)
+}
+
+/// Creates a storage instance in memory with a set of expected emitted events
+pub fn setup_test_storage() -> (Storage, Vec<StarknetEmittedEvent>) {
+    let (storage, _blocks, _transactions, _receipts, events) =
+        setup_test_storage_and_return_test_data();
     (storage, events)
 }
